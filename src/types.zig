@@ -24,6 +24,32 @@ pub const Stack = struct {
         return self.top;
     }
 
+    pub fn swap(self: *Stack, n: std.math.IntFittingRange(1, 16)) !void {
+        if (self.top == 0) {
+            return error.StackUnderflow;
+        }
+        const tp = self.top - 1;
+        if (n > tp) {
+            return error.StackUnderflow;
+        }
+        const to_swap_with = tp - n;
+        const temp = self.stack[tp];
+        self.stack[tp] = self.stack[to_swap_with];
+        self.stack[to_swap_with] = temp;
+    }
+
+    pub fn dup(self: *Stack, n: std.math.IntFittingRange(1, 16)) !void {
+        if (self.top == 0) {
+            return error.StackUnderflow;
+        }
+        const tp = self.top;
+        if (n > tp) {
+            return error.StackUnderflow;
+        }
+        const to_dup = tp - n;
+        self.push(self.stack[to_dup]);
+    }
+
     pub fn debug_stack(self: *Stack) void {
         std.debug.print("Stack: [", .{});
         for (0..self.top) |i| {

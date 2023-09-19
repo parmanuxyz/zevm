@@ -205,6 +205,51 @@ pub const Evm = struct {
         };
     }
 
+    pub fn codeliteral(allocator: *std.mem.Allocator, literal: []const u8) ![]u8 {
+        if (literal.len % 2 != 0) {
+            return error.InvalidCode;
+        }
+
+        const zero: u8 = '0';
+        const nine: u8 = '9';
+        const lower_a = 'a';
+        const lower_f = 'f';
+        const upper_a = 'A';
+        const upper_b = 'B';
+
+        var ret = try allocator.alloc(u8, literal.len / 2);
+
+        var idx: usize = 0;
+        var curr_half_byte: u8 = 0;
+        while (idx < literal.len) : (idx += 1) {
+            const byte = literal[idx];
+            const actual_half_byte = blk: {
+                switch (byte) {
+                    zero...nine => {
+                        break :blk byte - zero;
+                    },
+                    lower_a...lower_f => {
+                        break :blk byte - lower_a + 10;
+                    },
+                    upper_a...upper_b => {
+                        break :blk byte - upper_a + 10;
+                    },
+                    else => {
+                        return error.InvalidCode;
+                    },
+                }
+            };
+            if (idx % 2 == 1) {
+                const actual_byte = curr_half_byte << 4 | actual_half_byte;
+                const actual_idx = idx / 2;
+                ret[actual_idx] = actual_byte;
+            } else {
+                curr_half_byte = actual_half_byte;
+            }
+        }
+        return ret;
+    }
+
     pub fn execute(self: *Evm) !void {
         while (self.pc < self.code.len) {
             const op = @as(OpCodes, @enumFromInt(self.code[self.pc]));
@@ -215,7 +260,15 @@ pub const Evm = struct {
                     const b = self.stack.pop();
                     self.stack.push(a + b);
                 },
-                .PUSH1, .PUSH2, .PUSH3, .PUSH4, .PUSH5, .PUSH6, .PUSH7, .PUSH8, .PUSH9, .PUSH10, .PUSH11, .PUSH12, .PUSH13, .PUSH14, .PUSH15, .PUSH16, .PUSH17, .PUSH18, .PUSH19, .PUSH20, .PUSH21, .PUSH22, .PUSH23, .PUSH24, .PUSH25, .PUSH26, .PUSH27, .PUSH28, .PUSH29, .PUSH30, .PUSH31, .PUSH32 => {
+                // zig fmt: off
+                .PUSH1, .PUSH2, .PUSH3, .PUSH4, .PUSH5, 
+                .PUSH6, .PUSH7, .PUSH8, .PUSH9, .PUSH10, 
+                .PUSH11, .PUSH12, .PUSH13, .PUSH14, .PUSH15, 
+                .PUSH16, .PUSH17, .PUSH18, .PUSH19, .PUSH20, 
+                .PUSH21, .PUSH22, .PUSH23, .PUSH24, .PUSH25, 
+                .PUSH26, .PUSH27, .PUSH28, .PUSH29, .PUSH30, 
+                .PUSH31, .PUSH32 => {
+                // zig fmt: on
                     const push1_op_code = @intFromEnum(OpCodes.PUSH1);
                     const current_push_opcode = @intFromEnum(op);
                     const n = current_push_opcode - push1_op_code + 1;
@@ -223,6 +276,33 @@ pub const Evm = struct {
                         return error.InvalidPushN;
                     }
                     try self.do_push(@intCast(n));
+                },
+                // zig fmt: off
+                .SWAP1, .SWAP2, .SWAP3, .SWAP4, .SWAP5,
+                .SWAP6, .SWAP7, .SWAP8, .SWAP9, .SWAP10,
+                .SWAP11, .SWAP12, .SWAP13, .SWAP14, .SWAP15,
+                .SWAP16 => {
+                // zig fmt: on
+                    const swap1_op_code = @intFromEnum(OpCodes.SWAP1);
+                    const current_swap_opcode = @intFromEnum(op);
+                    const n = current_swap_opcode - swap1_op_code + 1;
+                    if (n > 16) {
+                        return error.InvalidSwapN;
+                    }
+                    try self.do_swap(@intCast(n));
+                },
+                // zig fmt: off
+                .DUP1, .DUP2, .DUP3, .DUP4, .DUP5, .DUP6,
+                .DUP7, .DUP8, .DUP9, .DUP10, .DUP11, .DUP12,
+                .DUP13, .DUP14, .DUP15, .DUP16 => {
+                // zig fmt: on
+                    const dup1_op_code = @intFromEnum(OpCodes.DUP1);
+                    const current_dup_opcode = @intFromEnum(op);
+                    const n = current_dup_opcode - dup1_op_code + 1;
+                    if (n > 16) {
+                        return error.InvalidDupN;
+                    }
+                    try self.do_dup(@intCast(n));
                 },
                 else => {
                     unreachable;
@@ -232,10 +312,18 @@ pub const Evm = struct {
         }
     }
 
-    fn do_push(self: *Evm, n: u5) !void {
+    fn do_push(self: *Evm, n: std.math.IntFittingRange(1, 32)) !void {
         const num = self.code[self.pc .. self.pc + n];
         self.stack.push(try Evm.get_num(num));
         self.pc += n;
+    }
+
+    fn do_swap(self: *Evm, n: std.math.IntFittingRange(1, 16)) !void {
+        try self.stack.swap(n);
+    }
+
+    fn do_dup(self: *Evm, n: std.math.IntFittingRange(1, 16)) !void {
+        try self.stack.dup(n);
     }
 
     fn get_num(bytes: []const u8) !usize {
