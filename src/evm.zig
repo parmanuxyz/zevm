@@ -251,14 +251,63 @@ pub const Evm = struct {
     }
 
     pub fn execute(self: *Evm) !void {
-        while (self.pc < self.code.len) {
+        while (self.pc < self.code.len) blk: {
             const op = @as(OpCodes, @enumFromInt(self.code[self.pc]));
             self.pc += 1;
             switch (op) {
+                .STOP => {
+                    break :blk;
+                },
                 .ADD => {
+                    // TODO: wrapping add
                     const a = self.stack.pop();
                     const b = self.stack.pop();
                     self.stack.push(a + b);
+                },
+                .MUL => {
+                    const a = self.stack.pop();
+                    const b = self.stack.pop();
+                    self.stack.push(a * b);
+                },
+                .SUB => {
+                    // TODO: wrapping sub
+                    const a = self.stack.pop();
+                    const b = self.stack.pop();
+                    self.stack.push(a - b);
+                },
+                .DIV => {
+                    const a = self.stack.pop();
+                    const b = self.stack.pop();
+                    self.stack.push(if (b == 0) 0 else a / b);
+                },
+                .SDIV => {
+                    // TODO
+                    unreachable;
+                },
+                .MOD => {
+                    const a = self.stack.pop();
+                    const b = self.stack.pop();
+                    self.stack.push(if (b == 0) 0 else a % b);
+                },
+                .SMOD => {
+                    // TODO
+                    unreachable;
+                },
+                .ADDMOD => {
+                    const a = self.stack.pop();
+                    const b = self.stack.pop();
+                    const c = self.stack.pop();
+                    self.stack.push(if (c == 0) 0 else (a + b) % c);
+                },
+                .MULMOD => {
+                    const a = self.stack.pop();
+                    const b = self.stack.pop();
+                    const c = self.stack.pop();
+                    self.stack.push(if (c == 0) 0 else (a * b) % c);
+                },
+                .EXP, .SIGNEXTEND => {
+                    // TODO
+                    unreachable;
                 },
                 // zig fmt: off
                 .PUSH1, .PUSH2, .PUSH3, .PUSH4, .PUSH5, 
